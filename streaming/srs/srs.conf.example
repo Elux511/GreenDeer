@@ -1,0 +1,39 @@
+# SRS 配置片段示例 — 请与实际 srs.conf 合并使用，并自行开启鉴权、HTTPS、日志等生产项。
+
+listen              1935;
+max_connections     1000;
+srs_log_tank        file;
+srs_log_file        ./objs/srs.log;
+
+http_api {
+    enabled         on;
+    listen          1985;
+}
+http_server {
+    enabled         on;
+    listen          8080;
+    dir             ./objs/nginx/html;
+}
+rtc_server {
+    enabled on;
+    listen 8000;
+    # 生产环境需配置 candidate 等，参见 SRS 官方文档
+}
+
+vhost __defaultVhost__ {
+    hls {
+        enabled         on;
+    }
+    http_remux {
+        enabled     on;
+        mount       [vhost]/[app]/[stream].flv;
+    }
+    rtc {
+        enabled     on;
+        rtmp_to_rtc on;
+        rtc_to_rtmp on;
+    }
+    play {
+        gop_cache_max_frames 2500;
+    }
+}
