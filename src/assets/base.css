@@ -17,6 +17,13 @@
   box-sizing: border-box;
 }
 
+/* OBS 仅叠加层：根节点加 class obs-overlay，配合浏览器源「允许透明」 */
+html.obs-overlay,
+html.obs-overlay body,
+html.obs-overlay #app {
+  background: transparent !important;
+}
+
 body {
   margin: 0;
   font-family:

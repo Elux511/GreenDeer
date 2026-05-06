@@ -21,6 +21,18 @@ export const router = createRouter({
       component: () => import('@/views/ProductsView.vue'),
       meta: { title: '商品与溯源' },
     },
+    {
+      path: '/overlay',
+      name: 'overlay',
+      component: () => import('@/views/OverlayView.vue'),
+      meta: { title: 'OBS商品叠加', minimal: true },
+    },
+    {
+      path: '/scene',
+      name: 'scene',
+      component: () => import('@/views/SceneView.vue'),
+      meta: { title: 'OBS合成场景', minimal: true },
+    },
   ],
 })
 

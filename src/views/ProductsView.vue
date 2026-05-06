@@ -1,49 +1,39 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { useProductStore } from '@/stores/products'
 
-type Product = {
-  id: string
-  name: string
-  origin: string
-  price: string
-  traceUrl?: string
+const products = useProductStore()
+
+function pickLive(id: string) {
+  products.setCurrentLiveProduct(id)
 }
-
-const items = ref<Product[]>([
-  {
-    id: 'p1',
-    name: '官塘牛肉（示例）',
-    origin: '广东潮州 · 湘桥区',
-    price: '¥ 128 / 500g',
-    traceUrl: '#',
-  },
-  {
-    id: 'p2',
-    name: '杨桃（示例）',
-    origin: '广东潮州 · 官塘镇',
-    price: '¥ 29.9 / 箱',
-  },
-])
 </script>
 
 <template>
   <div class="stack">
     <section class="card">
-      <h1>商品与溯源占位</h1>
+      <h1>商品数据同步 · 溯源</h1>
       <p class="muted">
-        后续对接 Spring Boot 商品接口与二维码溯源页。直播画面中可使用叠加层组件挂载当前讲解商品（见
-        <code>src/components/ProductCardOverlay.vue</code>）。
+        列表来自 <code>GET /api/products</code>（未配置或请求失败时使用本地示例数据）。设为「当前讲解商品」后，与直播控制台、OBS
+        <code>/overlay</code> / <code>/scene</code> 参数联动。
       </p>
     </section>
 
+    <p v-if="products.loading" class="muted">加载中…</p>
+
     <div class="grid2">
-      <article v-for="p in items" :key="p.id" class="card product">
+      <article v-for="p in products.items" :key="p.id" class="card product">
         <div class="title">{{ p.name }}</div>
         <div class="muted">产地：{{ p.origin }}</div>
         <div class="price">{{ p.price }}</div>
         <div class="row">
-          <a v-if="p.traceUrl" :href="p.traceUrl" class="link">溯源（占位）</a>
-          <span v-else class="muted">暂无溯源链接</span>
+          <span v-if="products.currentLiveProductId === p.id" class="live">当前讲解</span>
+          <button type="button" class="btn mini" @click="pickLive(p.id)">设为当前讲解</button>
+        </div>
+        <div class="row foot">
+          <a v-if="p.traceUrl && p.traceUrl !== '#'" :href="p.traceUrl" class="link" target="_blank" rel="noreferrer"
+            >溯源链接</a
+          >
+          <span v-else class="muted">溯源链接待配置</span>
         </div>
       </article>
     </div>
@@ -69,7 +59,26 @@ h1 {
 
 .row {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.row.foot {
+  margin-top: 0.5rem;
   justify-content: flex-end;
+}
+
+.live {
+  font-size: 0.82rem;
+  color: var(--success);
+  font-weight: 600;
+}
+
+.btn.mini {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.85rem;
 }
 
 .link {
@@ -79,6 +88,5 @@ h1 {
 
 code {
   font-size: 0.85rem;
-  color: var(--muted);
 }
 </style>
