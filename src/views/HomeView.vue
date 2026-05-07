@@ -33,6 +33,7 @@ import ProductCardOverlay from '@/components/ProductCardOverlay.vue'
           name="番石榴（示例）"
           origin="潮州官塘"
           price="¥ 19.9 / 箱"
+          link-url="https://example.com/product/guava-demo"
         />
       </div>
     </section>

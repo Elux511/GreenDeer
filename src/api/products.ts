@@ -9,13 +9,14 @@ export const MOCK_PRODUCTS: Product[] = [
     name: '官塘牛肉（示例）',
     origin: '广东潮州 · 湘桥区',
     price: '¥ 128 / 500g',
-    traceUrl: '#',
+    traceUrl: 'https://example.com/product/demo-beef',
   },
   {
     id: 'p2',
     name: '杨桃（示例）',
     origin: '广东潮州 · 官塘镇',
     price: '¥ 29.9 / 箱',
+    traceUrl: 'https://example.com/product/demo-starfruit',
   },
 ]
 

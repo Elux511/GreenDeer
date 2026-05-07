@@ -137,7 +137,9 @@ onMounted(() => {
         </button>
       </div>
       <p class="muted tiny">
-        <code>/overlay</code>：仅商品卡片（透明背景）。<code>/scene</code>：数字人占位区 + 商品卡片，单源合成。
+        <code>/overlay</code>：仅商品卡片（透明背景）。<code>/scene</code>：数字人占位区 + 商品卡片，单源合成。商品在后台配置的溯源/购买链接（
+        <code>traceUrl</code>
+        ）会以<strong>二维码</strong>出现在卡片上，便于观众扫码跳转（适合 OBS 捕获画面）。
       </p>
     </section>
 

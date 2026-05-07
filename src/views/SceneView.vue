@@ -15,6 +15,7 @@ const { product } = useRouteProduct()
       :name="product.name"
       :price="product.price"
       :origin="product.origin"
+      :link-url="product.traceUrl"
     />
   </div>
 </template>

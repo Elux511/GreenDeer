@@ -21,6 +21,7 @@ onUnmounted(() => {
       :name="product.name"
       :price="product.price"
       :origin="product.origin"
+      :link-url="product.traceUrl"
     />
     <div v-else-if="!loading" class="hint muted">未找到商品，请检查 URL 参数 productId</div>
   </div>
