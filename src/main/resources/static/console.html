@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GreenDeer · AI 数字人直播控制台</title>
+<style>
+  :root { --bg:#0f1420; --panel:#1a2130; --line:#2a3548; --fg:#e7edf7; --dim:#8fa0b8;
+          --acc:#4f8cff; --ok:#2ecc71; --warn:#f1c40f; --bad:#e74c3c; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--fg); font:14px/1.6 "Microsoft YaHei",system-ui,sans-serif; padding:16px; }
+  h1 { font-size:18px; margin-bottom:4px; }
+  .sub { color:var(--dim); margin-bottom:14px; font-size:12px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(360px,1fr)); gap:14px; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px 14px; }
+  .panel h2 { font-size:14px; color:var(--acc); margin-bottom:10px; border-bottom:1px dashed var(--line); padding-bottom:6px; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:8px; }
+  label { color:var(--dim); font-size:12px; }
+  input,select,textarea { background:#121a29; color:var(--fg); border:1px solid var(--line); border-radius:6px;
+          padding:6px 8px; font-size:13px; }
+  textarea { width:100%; resize:vertical; min-height:56px; font-family:inherit; }
+  button { background:#223049; color:var(--fg); border:1px solid var(--line); border-radius:6px; padding:6px 12px;
+          cursor:pointer; font-size:13px; }
+  button:hover { border-color:var(--acc); }
+  button.primary { background:var(--acc); border-color:var(--acc); color:#fff; }
+  button.ok { background:#1c5d3a; border-color:var(--ok); }
+  button.bad { background:#5d2330; border-color:var(--bad); }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  .badge { display:inline-block; padding:1px 8px; border-radius:10px; font-size:12px; background:#223049; }
+  .badge.LIVE { background:#1c5d3a; color:#7fffa8; }
+  .badge.PAUSED { background:#5d521c; color:#ffe98a; }
+  .badge.ENDED, .badge.CREATED { background:#3a2c2c; color:#ff9d9d; }
+  .feed { height:260px; overflow-y:auto; border:1px solid var(--line); border-radius:8px; padding:8px; background:#10161f; }
+  .msg { margin:6px 0; padding:6px 8px; border-radius:6px; background:#161e2c; }
+  .msg .who { color:var(--acc); font-weight:600; margin-right:6px; }
+  .msg.comment { border-left:3px solid #5a6b85; }
+  .msg.reply { border-left:3px solid var(--ok); }
+  .msg.sys { border-left:3px solid var(--warn); color:var(--dim); font-size:12px; }
+  .msg .meta { color:var(--dim); font-size:11px; }
+  .scenes button { margin:2px 4px 2px 0; }
+  .mono { font-family:Consolas,monospace; font-size:12px; color:var(--dim); word-break:break-all; }
+  .feed::-webkit-scrollbar { width:6px; } .feed::-webkit-scrollbar-thumb { background:var(--line); border-radius:3px; }
+  iframe { width:100%; height:240px; border:1px solid var(--line); border-radius:8px; background:#000; }
+  .toast { position:fixed; right:16px; bottom:16px; max-width:320px; background:#26324a; border:1px solid var(--line);
+          padding:8px 12px; border-radius:8px; display:none; }
+  a { color:var(--acc); }
+</style>
+</head>
+<body>
+<h1>🎙️ GreenDeer · AI 数字人直播控制台</h1>
+<div class="sub">后端编排：弹幕 AI 互动(LLM→TTS→实时推送) · OBS 推流集成 · DH_live 网页数字人接线。浏览器画面由 OBS 采集推流。</div>
+
+<div class="grid">
+
+  <!-- 场次 -->
+  <section class="panel">
+    <h2>📺 直播场次</h2>
+    <div class="row">
+      <select id="sessionSelect" style="min-width:180px"></select>
+      <button onclick="loadSession()">载入</button>
+    </div>
+    <div class="row">
+      <input id="newName" placeholder="新场次名称" style="flex:1">
+      <button class="primary" onclick="createSession()">新建</button>
+    </div>
+    <div id="sessionInfo" class="mono"></div>
+    <div class="row" style="margin-top:8px">
+      <label>人设(system prompt)</label>
+    </div>
+    <textarea id="persona"></textarea>
+    <div class="row" style="margin-top:8px">
+      <button onclick="savePersona()">保存人设</button>
+      <button class="ok" onclick="sessionAction('start')">▶ 开始直播</button>
+      <button onclick="sessionAction('pause')">⏸ 暂停</button>
+      <button class="bad" onclick="sessionAction('stop')">⏹ 结束</button>
+      <button onclick="sessionAction('interrupt')">✂ 中断AI回复</button>
+    </div>
+    <div class="row" style="margin-top:6px">
+      <button onclick="loadSetup()">🔌 直播接线指引</button>
+      <button onclick="loadMessages(true)">刷新消息</button>
+      <label>自动回复 <input type="checkbox" id="autoReply"></label>
+    </div>
+    <div id="setupInfo" class="mono" style="margin-top:6px"></div>
+  </section>
+
+  <!-- 互动 -->
+  <section class="panel">
+    <h2>💬 弹幕 / AI 互动</h2>
+    <div class="row">
+      <input id="dmUser" placeholder="观众名" value="观众小明" style="width:110px">
+      <input id="dmText" placeholder="输入一条弹幕，回车发送" style="flex:1">
+      <button class="primary" onclick="sendComment()">发送</button>
+    </div>
+    <div class="feed" id="feed"></div>
+    <div class="row" style="margin-top:8px">
+      <label>TTS音色</label>
+      <select id="voiceSelect" style="min-width:150px"></select>
+      <input id="ttsText" placeholder="试音文本" style="flex:1">
+      <button onclick="synth()">🔊 试音</button>
+    </div>
+    <div class="sub">WS 状态：<span id="wsState">未连接</span> · 提示音/静音来自 mock 音色，配置真实引擎后为真人语音。</div>
+  </section>
+
+  <!-- OBS -->
+  <section class="panel">
+    <h2>📡 OBS 推流集成</h2>
+    <div class="row">
+      <input id="obsHost" placeholder="主机" style="width:110px">
+      <input id="obsPort" placeholder="端口(4455)" style="width:90px">
+      <input id="obsPass" type="password" placeholder="密码" style="width:110px">
+      <button onclick="obsConnect()">连接</button>
+      <button onclick="obsDisconnect()">断开</button>
+      <button onclick="obsStatus()">状态</button>
+    </div>
+    <div id="obsInfo" class="mono"></div>
+    <div class="row" style="margin-top:6px"><label>场景：</label><span id="sceneButtons" class="scenes"></span></div>
+    <div class="row">
+      <button class="ok" onclick="obsStream('start')">▶ 开始推流</button>
+      <button class="bad" onclick="obsStream('stop')">⏹ 停止推流</button>
+      <button onclick="refreshObs()">🔄 刷新状态</button>
+    </div>
+    <div class="feed" id="obsLog" style="height:120px"></div>
+    <div class="sub">通用 RTMP：先在 OBS「设置→直播」配置服务/地址(场次 rtmpUrl)，或用平台网页开播后由 OBS 推流。</div>
+  </section>
+
+  <!-- 数字人 -->
+  <section class="panel">
+    <h2>🧑 数字人画面(DH_live)</h2>
+    <div id="dhHint" class="mono"></div>
+    <div id="dhFrameWrap" style="display:none"><iframe id="dhFrame"></iframe></div>
+    <div class="sub">若已运行 DH_live 网页服务并内嵌，可把 dialog.js 顶部 server_url 改为
+      <span class="mono">http://&lt;后端&gt;:8080/api/v1/eb_stream</span>，即可由本系统驱动回复(文本+音频逐句推送)。</div>
+  </section>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const api = async (path, opts = {}) => {
+  const res = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...opts });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok || body.code !== 0) { toast((body.message || ('HTTP ' + res.status)) + ' ' + path); throw new Error(body.message || res.status); }
+  return body.data;
+};
+const wsBase = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host;
+let sessionId = parseInt(new URLSearchParams(location.search).get('s') || '0', 10);
+let ws = null, lastMsgId = 0, replyBuf = {}, playDenied = false;
+let autoReplyToggle = true;
+
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', 3500); }
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c])); }
+
+async function init() {
+  await loadVoices();
+  const list = await api('/api/v1/sessions');
+  const sel = $('sessionSelect');
+  sel.innerHTML = '';
+  for (const s of list) sel.add(new Option((s.id + ' · ' + s.name + ' [' + s.status + ']'), s.id));
+  if (sessionId) { sel.value = sessionId; await loadSession(); }
+  setInterval(() => { if (sessionId) refreshObs(); }, 8000);
+}
+async function createSession() {
+  const name = $('newName').value.trim();
+  if (!name) return toast('请输入场次名称');
+  const s = await api('/api/v1/sessions', { method: 'POST', body: JSON.stringify({ name }) });
+  toast('已创建场次 #' + s.id);
+  await init();
+  $('sessionSelect').value = s.id; sessionId = s.id; history.replaceState(null, '', '?s=' + s.id);
+  await loadSession();
+}
+async function loadSession() {
+  sessionId = parseInt($('sessionSelect').value || '0', 10);
+  if (!sessionId) return;
+  history.replaceState(null, '', '?s=' + sessionId);
+  const s = await api('/api/v1/sessions/' + sessionId);
+  $('sessionInfo').innerHTML = renderSessionInfoFrom(s);
+  $('persona').value = s.persona || '';
+  $('autoReply').checked = s.autoReply;
+  connectWs();
+  lastMsgId = 0; $('feed').innerHTML = '';
+  await loadMessages(true);
+  await loadSetup();
+}
+function renderSessionInfoFrom(s) {
+  return '场次 #' + s.id + ' <b>' + esc(s.name) + '</b> <span class="badge ' + s.status + '">' + s.status + '</span>'
+    + '<br>平台:' + (s.platform || '-') + ' · RTMP:' + esc(s.rtmpUrl || '-')
+    + ' · 音色:' + esc(s.ttsVoice || '-') + ' · 消息:' + s.messageCount
+    + ' · 队列:' + s.queueSize + ' · 忙碌:' + s.busy + ' · WS连接:' + s.wsConnections;
+}
+async function refreshStatsOnly() {
+  if (!sessionId) return;
+  try {
+    const s = await api('/api/v1/sessions/' + sessionId);
+    $('sessionInfo').innerHTML = renderSessionInfoFrom(s);
+    $('autoReply').checked = s.autoReply;
+  } catch (e) { /* 忽略 */ }
+}
+async function savePersona() {
+  await api('/api/v1/sessions/' + sessionId, { method: 'PUT', body: JSON.stringify({ persona: $('persona').value }) });
+  toast('人设已保存');
+}
+async function sessionAction(action) {
+  await api(`/api/v1/sessions/${sessionId}/${action}`, { method: 'POST' });
+  toast('操作完成: ' + action);
+  await refreshStatsOnly();
+}
+async function sendComment() {
+  const content = $('dmText').value.trim(); if (!content) return;
+  try { await api(`/api/v1/sessions/${sessionId}/comments`, { method: 'POST', body: JSON.stringify({ userName: $('dmUser').value, content }) }); } catch (e) { /* 已 toast */ }
+  $('dmText').value = '';
+}
+$('dmText').addEventListener('keydown', e => { if (e.key === 'Enter') sendComment(); });
+$('autoReply').addEventListener('change', async e => {
+  await api('/api/v1/sessions/' + sessionId, { method: 'PUT', body: JSON.stringify({ autoReply: e.target.checked }) });
+});
+
+// ---------------- WS 实时 ---------------- //
+function connectWs() {
+  if (ws) { ws.onclose = null; ws.close(); }
+  ws = new WebSocket(`${wsBase}/ws/live/${sessionId}`);
+  $('wsState').textContent = '连接中…';
+  ws.onopen = () => { $('wsState').textContent = '已连接'; };
+  ws.onclose = () => { $('wsState').textContent = '已断开(重连中)'; setTimeout(() => { if (sessionId) connectWs(); }, 3000); };
+  ws.onerror = () => ws.close();
+  ws.onmessage = ev => { try { handleFrame(JSON.parse(ev.data)); } catch (e) {} };
+}
+function handleFrame(f) {
+  if (f.type === 'comment') appendMsg('comment', f.userName, f.content, 'msg#' + f.messageId);
+  else if (f.type === 'reply_start') { replyBuf[f.replyId] = { text: '', el: newReplyEl(f.replyId) }; }
+  else if (f.type === 'reply_chunk') {
+    const r = replyBuf[f.replyId] || (replyBuf[f.replyId] = { text: '', el: newReplyEl(f.replyId) });
+    r.text += f.text;
+    if (f.endpoint) {
+      r.el.querySelector('.body').textContent = r.text;
+      r.el.querySelector('.meta').textContent = r.text.length + '字 · ' + (f.durationMs || 0) + 'ms · 已结束';
+      delete replyBuf[f.replyId];
+    } else {
+      r.el.querySelector('.body').textContent = r.text + '…';
+    }
+    if (f.audio) playAudio(f.audio, f.mime);
+  }
+  else if (f.type === 'reply_error') { toast('AI 回复失败: ' + (f.message || '')); appendMsg('sys', 'AI', f.message || '回复失败', ''); }
+  else if (f.type === 'session_event') { appendMsg('sys', '系统', f.message || f.event, f.event); refreshStatsOnly(); }
+  else if (f.type === 'obs_event') { obsLog(f.eventType + ' ' + JSON.stringify(f.eventData || {})); }
+  else if (f.type === 'error') toast('服务端: ' + f.message);
+}
+function appendMsg(kind, who, content, meta) {
+  const feed = $('feed');
+  const d = document.createElement('div');
+  d.className = 'msg ' + kind;
+  d.innerHTML = `<span class="who">${esc(who)}</span><span>${esc(content)}</span><div class="meta">${esc(meta || '')}</div>`;
+  feed.appendChild(d); feed.scrollTop = feed.scrollHeight;
+}
+function newReplyEl(replyId) {
+  const d = document.createElement('div');
+  d.className = 'msg reply';
+  d.innerHTML = '<span class="who">AI主播</span><span class="body">思考中…</span><div class="meta">reply#' + replyId + ' · 生成中</div>';
+  $('feed').appendChild(d); $('feed').scrollTop = $('feed').scrollHeight;
+  return d;
+}
+function playAudio(b64, mime) {
+  const m = mime || 'audio/wav';
+  const a = new Audio('data:' + m + ';base64,' + b64);
+  a.play().catch(() => { if (!playDenied) { playDenied = true; toast('浏览器阻止自动播放语音：请点击页面任意处后再试'); } });
+}
+async function loadMessages(first) {
+  if (!sessionId) return;
+  const page = await api(`/api/v1/sessions/${sessionId}/messages?afterId=${lastMsgId}&limit=100`);
+  for (const m of page.items) {
+    const kind = m.type === 'COMMENT' ? 'comment' : m.type === 'REPLY' ? 'reply' : 'sys';
+    if (m.type === 'REPLY') appendMsg(kind, m.userName || 'AI主播', m.content, '回应#' + (m.replyToId || '') + ' · ' + (m.audioDurationMs || 0) + 'ms');
+    else appendMsg(kind, m.userName || '', m.content, 'msg#' + m.id);
+    lastMsgId = Math.max(lastMsgId, m.id);
+  }
+  if (first && page.hasMore) loadMessages(false);
+}
+
+// ---------------- TTS ---------------- //
+async function loadVoices() {
+  const vs = await api('/api/v1/tts/voices');
+  const sel = $('voiceSelect');
+  sel.innerHTML = '';
+  for (const v of vs) sel.add(new Option(v.name + (v.available ? '' : ' (不可用)') + ' · ' + v.provider, v.name));
+}
+async function synth() {
+  const text = $('ttsText').value.trim(); if (!text) return toast('请输入试音文本');
+  const r = await api('/api/v1/tts/synthesize', { method: 'POST', body: JSON.stringify({ text, voice: $('voiceSelect').value }) });
+  toast(`TTS OK · provider=${r.provider} · ${r.sampleRate}Hz · ${r.durationMs}ms`);
+  playAudio(r.audioBase64, r.mime);
+}
+
+// ---------------- OBS ---------------- //
+function obsLog(line) {
+  const log = $('obsLog'); const d = document.createElement('div'); d.textContent = new Date().toLocaleTimeString() + '  ' + line;
+  log.appendChild(d); while (log.children.length > 200) log.removeChild(log.firstChild); log.scrollTop = log.scrollHeight;
+}
+async function obsStatus() {
+  const s = await api('/api/v1/obs/status');
+  $('obsHost').placeholder = s.defaultHost || '127.0.0.1'; $('obsPort').placeholder = s.defaultPort || '4455';
+  $('obsInfo').textContent = s.connected
+    ? ('已连接 · OBS ' + (s.obsVersion || '?') + ' · ws ' + (s.obsWebSocketVersion || '?') + (s.streamStatus && s.streamStatus.active ? ' · 🔴推流中' : ' · 未推流'))
+    : '未连接（在 OBS：工具 → WebSocket 服务器设置 开启）';
+  return s;
+}
+async function obsConnect() {
+  const body = { host: $('obsHost').value || null, port: $('obsPort').value ? parseInt($('obsPort').value) : null, password: $('obsPass').value || null };
+  await api('/api/v1/obs/connect', { method: 'POST', body: JSON.stringify(body) });
+  toast('OBS 已连接'); obsLog('连接成功'); await refreshObs();
+}
+async function obsDisconnect() { await api('/api/v1/obs/disconnect', { method: 'POST' }); toast('已断开'); obsLog('已断开'); }
+async function refreshObs() {
+  try {
+    const s = await obsStatus();
+    if (!s.connected) { $('sceneButtons').innerHTML = ''; return; }
+    const scenes = await api('/api/v1/obs/scenes');
+    $('sceneButtons').innerHTML = '';
+    for (const sc of scenes.scenes || []) {
+      const b = document.createElement('button');
+      b.textContent = sc.sceneName + (sc.sceneName === scenes.current ? ' ✔' : '');
+      b.onclick = async () => { await api('/api/v1/obs/scenes/switch', { method: 'POST', body: JSON.stringify({ sceneName: sc.sceneName }) }); toast('已切换场景: ' + sc.sceneName); await refreshObs(); };
+      $('sceneButtons').appendChild(b);
+    }
+  } catch (e) {}
+}
+async function obsStream(a) {
+  await api('/api/v1/obs/stream/' + a, { method: 'POST' });
+  toast(a === 'start' ? '推流已启动' : '推流已停止'); obsLog('推流 ' + a); await refreshObs();
+}
+
+// ---------------- 接线指引 ---------------- //
+async function loadSetup() {
+  if (!sessionId) return;
+  try {
+    const st = await api(`/api/v1/sessions/${sessionId}/setup`);
+    $('setupInfo').innerHTML = '控制台: ' + esc(st.consoleUrl) + '<br>eb_stream: ' + esc(st.ebStreamUrl)
+      + '<br>数字人页: ' + esc(st.digitalHumanPageUrl || '(未配置)')
+      + '<br>' + esc(st.rtmpHint) + '<br>' + esc(st.obsHint);
+    $('dhHint').textContent = st.digitalHumanPageUrl
+      ? '把该页加入 OBS「浏览器」来源，再用本面板一键推流。下方为内嵌预览：'
+      : '未配置数字人页面：可在 application.yml 的 app.demo.digital-human-page-url 填 DH_live MiniLive 地址后刷新。';
+    const wrap = $('dhFrameWrap');
+    if (st.digitalHumanPageUrl) { wrap.style.display = 'block'; $('dhFrame').src = st.digitalHumanPageUrl; } else wrap.style.display = 'none';
+  } catch (e) {}
+}
+
+init();
+</script>
+</body>
+</html>

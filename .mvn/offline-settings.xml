@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  GreenDeer 离线构建 settings：本机无法访问外网，且全局 settings.xml 里 nexus-aliyun
+  镜像(mirrorOf=central)与本地仓库 _remote.repositories(记录为 central)不匹配，
+  导致离线解析失败。此文件去掉镜像，直接按 central 命中本地缓存。
+
+  用法: mvn -gs .mvn/offline-settings.xml -o <goal>
+       （若 ~/.m2/settings.xml 存在，再追加 -s .mvn/offline-settings.xml）
+-->
+<settings xmlns="http://maven.apache.org/SETTINGS/1.2.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.2.0 https://maven.apache.org/xsd/settings-1.2.0.xsd">
+  <localRepository>${user.home}/.m2/repository</localRepository>
+  <offline>true</offline>
+  <mirrors/>
+  <profiles/>
+</settings>

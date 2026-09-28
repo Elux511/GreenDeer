@@ -1,0 +1,101 @@
+spring:
+  application:
+    name: GreenDeer
+
+  datasource:
+    # 默认连接本机 MySQL；所有凭据均可通过环境变量覆盖，避免明文入库
+    # createDatabaseIfNotExist 需要账号有建库权限(如 root)
+    url: jdbc:mysql://${DB_HOST:127.0.0.1}:${DB_PORT:3306}/${DB_NAME:greendeer}?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${DB_USER:root}
+    password: ${DB_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+
+  jpa:
+    hibernate:
+      ddl-auto: update          # MVP 阶段自动建表；上线前建议改为 validate + Flyway
+    open-in-view: false
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  mvc:
+    async:
+      request-timeout: 120s     # eb_stream 长连接/流式接口的异步超时
+
+  jackson:
+    # Boot4 默认 Jackson3(tools.jackson)；2.x 风格的 feature 键不再适用，仅保留时区
+    time-zone: GMT+8
+
+server:
+  port: 8080
+  # 控制台/页面在局域网或本机使用，建议生产环境关闭或收紧
+  servlet:
+    encoding:
+      charset: UTF-8
+      force: true
+
+logging:
+  level:
+    root: INFO
+    com.it.greendeer: INFO
+    org.hibernate.SQL: WARN
+
+app:
+  audio-dir: ${AUDIO_DIR:./data/audio}   # AI 回复音频落盘目录(便于回放/排查)
+
+  llm:
+    provider: ${LLM_PROVIDER:mock}       # mock | openai
+    system-prompt: "你是直播间里一位热情、专业、风趣的AI助播。请用口语化、简短的中文回答观众问题，不要使用 Markdown 格式，不要长篇大论。"
+    openai:
+      base-url: ${LLM_BASE_URL:https://api.deepseek.com}   # OpenAI 兼容 /chat/completions
+      api-key: ${LLM_API_KEY:}
+      model: ${LLM_MODEL:deepseek-chat}
+      temperature: 0.8
+      max-tokens: 512
+      timeout-seconds: 90
+
+  tts:
+    provider: ${TTS_PROVIDER:mock}       # mock | sherpa-http | openai；mock 无依赖静音合成，用于演示闭环
+    default-voice: mock-silent
+    voices:
+      - { name: mock-silent, provider: mock, sample-rate: 16000, description: "静音占位音色：无 TTS 引擎时保证流程可演示" }
+      - { name: sherpa-vits-zh-ll, provider: sherpa-http, sample-rate: 16000, description: "本地 sherpa-onnx VITS 中文(需运行 tools/tts_gateway.py)" }
+      - { name: openai-alloy, provider: openai, sample-rate: 24000, description: "OpenAI 兼容 TTS(alloy)，输出 mp3" }
+    sherpa:
+      gateway-url: ${TTS_GATEWAY_URL:http://127.0.0.1:8899}
+      timeout-seconds: 30
+    openai:
+      base-url: ${TTS_BASE_URL:https://api.openai.com/v1}
+      api-key: ${TTS_API_KEY:}
+      model: tts-1
+      voice: alloy
+      response-format: mp3
+
+  chat:
+    max-history: 12            # 送入 LLM 的最近对话轮数(对/条)
+    max-queue: 64              # 每场次等待处理的弹幕队列上限
+    max-comment-length: 200    # 单条弹幕最长字数
+    default-persona: "你是直播间AI助播【小鹿】，性格开朗贴心。回答简短口语化，不超过80字。"
+    reply-fallback: "哎呀，主播这边信号不太好，稍等我一小下，马上回来回答你～"
+
+  obs:
+    host: ${OBS_HOST:127.0.0.1}
+    port: ${OBS_PORT:4455}
+    password: ${OBS_PASSWORD:}
+    request-timeout-seconds: 6
+
+  demo:
+    simulator-enabled: true           # 直播启动后自动投喂模拟弹幕，便于闭环演示
+    simulator-interval-sec: 6
+    simulator-user-names: ["热心观众", "路过的喵", "小新", "爱提问的老王", "深夜不睡"]
+    simulator-comments:
+      - "主播今天讲点什么呀？"
+      - "这个数字人好有意思，怎么做的？"
+      - "可以给我介绍一下今天的主推吗？"
+      - "主播声音真好听！"
+      - "弹幕互动是不是真的 AI 回答的？"
+    digital-human-page-url: ""        # 可选：DH_live 数字人页面地址(如 http://127.0.0.1:8888/static/MiniLive.html) 由 OBS Browser Source 采集

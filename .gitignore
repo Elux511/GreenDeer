@@ -1,0 +1,46 @@
+HELP.md
+target/
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### VS Code ###
+.vscode/
+
+### GreenDeer runtime ###
+data/
+logs/
+*.log
+*.wav.tmp
+
+# 本机数据库口令（一键启动 start.bat 读取），严禁入库
+local.env
+
+# 第三方参考工程(下载自 github.com/kleinlee/DH_live)，不入库
+/DH_live/
+
